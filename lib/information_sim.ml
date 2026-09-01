@@ -32,27 +32,27 @@ type episode_summary = {
 }
 
 let empty_account = { cash_balance = 0.0; inventory_units = 0 }
-
-let execute_fill account ~customer_side quote =
+let execute_fill account ~customer_side (live_quote : Domain.quote) =
   match customer_side with
   | Buy ->
       {
-        cash_balance = account.cash_balance +. quote.ask;
+        cash_balance = account.cash_balance +. live_quote.ask;
         inventory_units = account.inventory_units - 1;
       }
   | Sell ->
       {
-        cash_balance = account.cash_balance -. quote.bid;
+        cash_balance = account.cash_balance -. live_quote.bid;
         inventory_units = account.inventory_units + 1;
       }
 
-let settle account ~terminal_value =
-  account.cash_balance +. (float_of_int account.inventory_units *. terminal_value)
-
-let economic_trade_pnl ~terminal_value ~customer_side quote =
+let economic_trade_pnl
+    ~terminal_value
+    ~customer_side
+    (live_quote : Domain.quote)
+  =
   match customer_side with
-  | Buy -> quote.ask -. terminal_value
-  | Sell -> terminal_value -. quote.bid
+  | Buy -> live_quote.ask -. terminal_value
+  | Sell -> terminal_value -. live_quote.bid
 
 let run ~market ~tape ~starting_strategy ~keep_trace =
   let terminal_value = Domain.value_of_fundamental market tape.fundamental in
