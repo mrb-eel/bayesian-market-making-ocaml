@@ -159,7 +159,12 @@ The unit suite is dependency-free beyond the OCaml standard library and Dune. Ru
 opam exec -- dune runtest
 ```
 
-The main GitHub Actions workflow repeats the build, tests, reduced OCaml experiment run, output validation, plotting, and paper compilation from a clean environment. A separate job runs the NumPy implementation so the two numerical paths remain independent. The manual `full-reproduction` workflow runs the complete OCaml workload and uploads a fresh report, datasets, figures, and checksums.
+The main GitHub Actions workflow repeats the build, tests, reduced OCaml
+experiment run, output validation, plotting, and paper compilation from a clean
+environment. The manual `full-reproduction` workflow runs the complete OCaml
+workload and uploads a fresh report, datasets, figures, manifest, and checksums.
+The independent NumPy implementation can be run separately as a numerical
+cross-check.
 
 ## Limits of the model
 
@@ -169,9 +174,21 @@ Those omissions define the range of valid interpretation. A richer simulator is 
 
 ## Numerical provenance
 
-The OCaml implementation is the primary model and has passed the complete GitHub Actions reproduction workflow. An independently written NumPy implementation is retained as a numerical cross-check. Every generated output directory records its engine, seed, and workload profile in `run_manifest.csv`; the manifest is the source of truth for the provenance of a particular set of figures or CSV files.
+The OCaml implementation is the primary numerical engine. The checked-in CSV
+datasets, figures, and research paper correspond to the full OCaml reproduction
+using seed `20260831`.
 
-The complete provenance and reproduction policy is in [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
+The authoritative provenance record is `results/data/run_manifest.csv`, which
+records the engine, seed, workload profile, and experiment count used to
+generate the reference outputs.
+
+The independent NumPy implementation in `analysis/reference_runner.py` is
+retained as a numerical cross-check. It reimplements the model equations
+without calling or wrapping the OCaml executable and is not the source of the
+checked-in reference results.
+
+The complete provenance and reproduction policy is in
+[`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
 
 ## Paper
 
