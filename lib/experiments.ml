@@ -1,4 +1,5 @@
 open Domain
+open Order_tape
 
 type workload = {
   spread_trials : int;

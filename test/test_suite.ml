@@ -1,5 +1,6 @@
 open Market_maker
 open Domain
+open Order_tape
 
 let failures = ref []
 let fail message = raise (Failure message)
