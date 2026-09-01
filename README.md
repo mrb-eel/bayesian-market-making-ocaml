@@ -5,7 +5,7 @@ An OCaml research project on information-sensitive quoting, sequential Bayesian 
 The core model is deliberately small. An asset settles at either 90 or 110. Some customers know that terminal value; the rest trade for exogenous reasons. Since order direction is informative, a competitive market maker conditions its quotes on the event that a customer chooses to buy or sell. At the symmetric prior this gives the closed-form spread
 
 $$
-\operatorname{Ask}-\operatorname{Bid}=(H-L)\alpha.
+\mathrm{Ask}-\mathrm{Bid}=(H-L)\alpha.
 $$
 
 The formula is simple enough to derive by hand and strict enough to catch a broken simulator. The later experiments then ask where that clean result survives, where it becomes fragile, and which conclusions are artefacts of the execution model.
