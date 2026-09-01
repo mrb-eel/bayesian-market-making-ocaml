@@ -32,5 +32,5 @@ let write path rows =
           output_char channel '\n')
         rows)
 
-let float_cell value = Printf.sprintf "%.10g" value
+let float_cell value = Printf.sprintf "%.17g" value
 let int_cell = string_of_int
