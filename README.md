@@ -55,28 +55,28 @@ The checked-in numerical run uses seed `20260831` and the full workload. Its mai
 | Inventory skew | Moving the skew coefficient from `0` to `0.10` reduces mean maximum inventory by `57.8%` and P&L volatility by `69.3%`, while mean P&L falls by `3.1%`. |
 | Quote distance | Mean P&L peaks at a half-spread of `1.00` in the stated toy execution model. |
 
-These are simulation results, not evidence of live-market profitability. The misspecification experiment is especially sensitive to exogenous execution: when every incoming order must trade, excessively wide quotes do not lose volume and can appear artificially attractive. The report treats that outcome as a model failure mode rather than a trading result.
+These results serve strictly as simulation results and nothing more. The misspecification experiment is especially sensitive to exogenous execution: when every incoming order must trade excessively wide quotes do not lose volume and can appear artificially attractive and the report treats that outcome as a model failure mode rather than a trading result.
 
 ## Repository map
 
 ```text
 .
 ├── lib/
-│   ├── domain.ml              Core market, order-side, and quote types
-│   ├── binary_model.ml        Likelihoods, Bayes updates, and competitive quotes
-│   ├── order_tape.ml          Reproducible stationary and regime-switching flow
+│   ├── domain.ml              Core market order side and quote types
+│   ├── binary_model.ml        Likelihoods Bayes updates and competitive quotes
+│   ├── order_tape.ml          Reproducible stationary and regime switching flow
 │   ├── joint_filter.ml        Joint posterior over value and alpha
-│   ├── rolling_filter.ml      Finite-memory regime estimator
+│   ├── rolling_filter.ml      Finite memory regime estimator
 │   ├── strategy.ml            Strategy variants behind one interface
-│   ├── information_sim.ml     Accounting and adverse-selection experiments
+│   ├── information_sim.ml     Accounting and adverse selection experiments
 │   ├── inventory_sim.ml       Quote-sensitive fills and inventory skew
 │   ├── stats.ml               Monte Carlo summaries and quantiles
 │   └── experiments.ml         Experiment runners and CSV output
-├── bin/main.ml                Command-line entry point
-├── test/test_suite.ml         Twenty-three model and accounting checks
+├── bin/main.ml                Command line entry point
+├── test/test_suite.ml         Twenty three model and accounting checks
 ├── analysis/
 │   ├── reference_runner.py    Independent NumPy parity implementation
-│   ├── check_outputs.py       Dataset and model-invariant validation
+│   ├── check_outputs.py       Dataset and model invariant validation
 │   └── plot_results.py        Figures and generated LaTeX fragments
 ├── results/
 │   ├── data/                  Full reference-run CSVs
