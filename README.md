@@ -5,10 +5,10 @@ An OCaml research project on information-sensitive quoting, sequential Bayesian 
 The core model is deliberately small. An asset settles at either 90 or 110. Some customers know that terminal value; the rest trade for exogenous reasons. Since order direction is informative, a competitive market maker conditions its quotes on the event that a customer chooses to buy or sell. At the symmetric prior this gives the closed-form spread
 
 $$
-\mathrm{Ask}-\mathrm{Bid}=(H-L)\alpha.
+\mathrm{Ask}-\mathrm{Bid}=(H-L)\alpha
 $$
 
-The later experiments then ask where that clean result survives, where it becomes fragile, and which conclusions are artefacts of the execution model.
+The formula is simple enough to derive by hand and strict enough to catch a broken simulator. The later experiments then ask where that clean result survives, where it becomes fragile, and which conclusions are artefacts of the execution model.
 
 ![Analytical and simulated spread](results/figures/01_spread_validation.png)
 
@@ -45,38 +45,38 @@ The checked-in numerical run uses seed `20260831` and the full workload. Its mai
 
 | Experiment | Reference observation |
 |---|---|
-| Spread validation | Maximum absolute theory-simulation gap: `0.130` price units. |
+| Spread validation | Maximum absolute theory-simulation gap: `0.087` price units. |
 | Price discovery | Median time to 95% confidence: 28 trades at `alpha = 0.20`, versus 8 at `alpha = 0.40`. |
-| Static vs Bayesian | At `alpha = 0.20`, Bayesian updating reduces fair-value RMSE by `41.6%` and terminal P&L standard deviation by `62.0%`. |
-| Paired comparison | Mean Bayesian-minus-static RMSE difference at `alpha = 0.20`: `-4.16`, 95% Monte Carlo interval `[-4.25, -4.08]`. |
-| Misspecification | True `alpha = 0.40`, assumed `0.20`: mean terminal P&L `-19.03`; correct specification: `0.38`. |
-| Unknown alpha | Mean absolute error of the joint posterior mean: `0.068`. |
-| Regime change | A 20-trade rolling filter adapts on 99.5% of paths with median delay 17 trades; the full-history filter adapts on 12.1%. |
-| Inventory skew | Moving the skew coefficient from `0` to `0.10` reduces mean maximum inventory by `57.8%` and P&L volatility by `69.3%`, while mean P&L falls by `3.1%`. |
+| Static vs Bayesian | At `alpha = 0.20`, Bayesian updating reduces fair-value RMSE by `40.7%` and terminal P&L standard deviation by `61.1%`. |
+| Paired comparison | Mean Bayesian-minus-static RMSE difference at `alpha = 0.20`: `-4.07`, 95% Monte Carlo interval `[-4.15, -3.99]`. |
+| Misspecification | True `alpha = 0.40`, assumed `0.20`: mean terminal P&L `-19.09`; correct specification: `0.41`. |
+| Unknown alpha | Mean absolute error of the joint posterior mean: `0.067`. |
+| Regime change | A 20-trade rolling filter adapts on 99.1% of paths with median delay 17 trades; the full-history filter adapts on 13.0%. |
+| Inventory skew | Moving the skew coefficient from `0` to `0.10` reduces mean maximum inventory by `56.8%` and P&L volatility by `68.3%`, while mean P&L falls by `3.9%`. |
 | Quote distance | Mean P&L peaks at a half-spread of `1.00` in the stated toy execution model. |
 
-These results serve strictly as simulation results and nothing more. The misspecification experiment is especially sensitive to exogenous execution: when every incoming order must trade excessively wide quotes do not lose volume and can appear artificially attractive and the report treats that outcome as a model failure mode rather than a trading result.
+These are simulation results, not evidence of live-market profitability. The misspecification experiment is especially sensitive to exogenous execution: when every incoming order must trade, excessively wide quotes do not lose volume and can appear artificially attractive. The report treats that outcome as a model failure mode rather than a trading result.
 
 ## Repository map
 
 ```text
 .
 ├── lib/
-│   ├── domain.ml              Core market order side and quote types
-│   ├── binary_model.ml        Likelihoods Bayes updates and competitive quotes
-│   ├── order_tape.ml          Reproducible stationary and regime switching flow
+│   ├── domain.ml              Core market, order-side, and quote types
+│   ├── binary_model.ml        Likelihoods, Bayes updates, and competitive quotes
+│   ├── order_tape.ml          Reproducible stationary and regime-switching flow
 │   ├── joint_filter.ml        Joint posterior over value and alpha
-│   ├── rolling_filter.ml      Finite memory regime estimator
+│   ├── rolling_filter.ml      Finite-memory regime estimator
 │   ├── strategy.ml            Strategy variants behind one interface
-│   ├── information_sim.ml     Accounting and adverse selection experiments
+│   ├── information_sim.ml     Accounting and adverse-selection experiments
 │   ├── inventory_sim.ml       Quote-sensitive fills and inventory skew
 │   ├── stats.ml               Monte Carlo summaries and quantiles
 │   └── experiments.ml         Experiment runners and CSV output
-├── bin/main.ml                Command line entry point
-├── test/test_suite.ml         Twenty three model and accounting checks
+├── bin/main.ml                Command-line entry point
+├── test/test_suite.ml         Twenty-three model and accounting checks
 ├── analysis/
 │   ├── reference_runner.py    Independent NumPy parity implementation
-│   ├── check_outputs.py       Dataset and model invariant validation
+│   ├── check_outputs.py       Dataset and model-invariant validation
 │   └── plot_results.py        Figures and generated LaTeX fragments
 ├── results/
 │   ├── data/                  Full reference-run CSVs
@@ -159,12 +159,7 @@ The unit suite is dependency-free beyond the OCaml standard library and Dune. Ru
 opam exec -- dune runtest
 ```
 
-The main GitHub Actions workflow repeats the build, tests, reduced OCaml
-experiment run, output validation, plotting, and paper compilation from a clean
-environment. The manual `full-reproduction` workflow runs the complete OCaml
-workload and uploads a fresh report, datasets, figures, manifest, and checksums.
-The independent NumPy implementation can be run separately as a numerical
-cross-check.
+The main GitHub Actions workflow repeats the build, tests, reduced OCaml experiment run, output validation, plotting, and paper compilation from a clean environment. The manual `full-reproduction` workflow runs the complete OCaml workload and uploads a fresh report, datasets, figures, manifest, and checksums. The independent NumPy implementation can be run separately as a numerical cross-check.
 
 ## Limits of the model
 
@@ -174,21 +169,9 @@ Those omissions define the range of valid interpretation. A richer simulator is 
 
 ## Numerical provenance
 
-The OCaml implementation is the primary numerical engine. The checked-in CSV
-datasets, figures, and research paper correspond to the full OCaml reproduction
-using seed `20260831`.
+The OCaml implementation is the primary numerical engine. The checked-in CSV datasets, figures, and research paper correspond to the full OCaml reproduction using seed `20260831`. The authoritative provenance record is `results/data/run_manifest.csv`, which records the engine, seed, workload profile, and experiment count used to generate the reference outputs. The independent NumPy implementation in `analysis/reference_runner.py` is retained as a numerical cross-check: it reimplements the model equations without calling or wrapping the OCaml executable and is not the source of the checked-in reference results.
 
-The authoritative provenance record is `results/data/run_manifest.csv`, which
-records the engine, seed, workload profile, and experiment count used to
-generate the reference outputs.
-
-The independent NumPy implementation in `analysis/reference_runner.py` is
-retained as a numerical cross-check. It reimplements the model equations
-without calling or wrapping the OCaml executable and is not the source of the
-checked-in reference results.
-
-The complete provenance and reproduction policy is in
-[`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
+The complete provenance and reproduction policy is in [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md).
 
 ## Paper
 
