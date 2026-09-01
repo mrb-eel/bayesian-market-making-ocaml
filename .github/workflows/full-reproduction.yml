@@ -33,3 +33,70 @@ jobs:
           opam exec -- dune exec bin/main.exe -- all
           --seed 20260831
           --out release/results/data
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install analysis dependencies
+        run: python -m pip install -r analysis/requirements.txt
+
+      - name: Validate full OCaml results
+        run: python analysis/check_outputs.py --input release/results/data
+
+      - name: Generate figures
+        run: >-
+          python analysis/plot_results.py
+          --input release/results/data
+          --output release/results/figures
+          --report-dir release/report
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-fonts-recommended
+
+      - name: Compile research paper
+        run: |
+          cp report/main.tex release/report/main.tex
+          cd release/report
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+          mv main.pdf Bayesian_Market_Making_Report.pdf
+
+      - name: Record checksums
+        run: |
+          cd release
+          find results report \
+            -type f \
+            ! -name "*.aux" \
+            ! -name "*.log" \
+            ! -name "*.out" \
+            ! -name "*.toc" \
+            -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS.txt
+
+      - name: Remove LaTeX build files
+        run: |
+          rm -f release/report/*.aux
+          rm -f release/report/*.log
+          rm -f release/report/*.out
+          rm -f release/report/*.toc
+
+      - name: Show provenance
+        run: |
+          echo "Generated experiment manifest:"
+          cat release/results/data/run_manifest.csv
+
+      - name: Upload full reproduction
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-ocaml-reproduction
+          path: release/
+          if-no-files-found: error
+          retention-days: 30
