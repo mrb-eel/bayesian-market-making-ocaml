@@ -1,0 +1,73 @@
+name: ci
+
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ocaml-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.2.1
+
+      - name: Install package dependencies
+        run: opam install . --deps-only --with-test
+
+      - name: Build all targets
+        run: opam exec -- dune build @all
+
+      - name: Run OCaml tests
+        run: opam exec -- dune runtest
+
+      - name: Run reduced OCaml experiment suite
+        run: >-
+          opam exec -- dune exec bin/main.exe -- all --quick
+          --seed 20260831
+          --out _ci/results/data
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: analysis/requirements.txt
+
+      - name: Install analysis dependencies
+        run: python -m pip install -r analysis/requirements.txt
+
+      - name: Validate fresh OCaml output
+        run: python analysis/check_outputs.py --input _ci/results/data
+
+      - name: Generate figures and report fragments
+        run: >-
+          python analysis/plot_results.py
+          --input _ci/results/data
+          --output _ci/results/figures
+          --report-dir _ci/report
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-base \
+            texlive-latex-extra \
+            texlive-fonts-recommended
+
+      - name: Compile research paper
+        run: |
+          cp report/main.tex _ci/report/main.tex
+          cd _ci/report
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+          pdflatex -interaction=nonstopmode -halt-on-error main.tex
+          mv main.pdf Bayesian_Market_Making_Report_quick.pdf
