@@ -1,0 +1,16 @@
+opam-version: "2.0"
+synopsis: "Bayesian market-making experiments in OCaml"
+description: "A reproducible research simulator for adverse selection, Bayesian price discovery, model misspecification, regime change, and inventory-aware quoting."
+maintainer: "Mohamed Rayan Bouchaibi <moh.bouchaibi@gmail.com>"
+authors: ["Mohamed Rayan Bouchaibi"]
+license: "MIT"
+depends: [
+  "ocaml" {>= "4.14"}
+  "dune" {>= "3.11"}
+]
+build: [
+  ["dune" "build" "@all" "-j" jobs]
+]
+run-test: [
+  ["dune" "runtest" "-j" jobs]
+]

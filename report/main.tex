@@ -1,0 +1,486 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\graphicspath{{../results/figures/}}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!45!black,
+  citecolor=blue!45!black,
+  urlcolor=blue!45!black,
+  pdftitle={Bayesian Market Making in a Binary Information Model},
+  pdfauthor={Mohamed Rayan Bouchaibi}
+}
+
+\input{results_macros.tex}
+\input{strategy_table_rows.tex}
+\input{regime_table_rows.tex}
+
+\title{Bayesian Market Making in a Binary Information Model\\
+\large Sequential Learning, Misspecification, Regime Change, and Inventory Control}
+\author{Mohamed Rayan Bouchaibi}
+\date{September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This paper studies a deliberately small market-making model in which a terminal asset value is binary and incoming traders are either informed or liquidity-motivated. The model admits closed-form bid and ask prices, yet still exposes several problems that survive in less stylised settings: adverse selection, sequential learning from order direction, parameter uncertainty, and inventory accumulation. An OCaml simulator implements the model, while a separate Python implementation repeats the equations as an independent numerical check. The experiments validate the analytical informational spread, compare static and Bayesian quoting on paired order tapes, examine misspecification of the informed-trader probability, and test a rolling estimator after an abrupt regime change. A second execution model introduces quote-dependent fills and inventory skew. Keeping the two environments separate is methodologically inconvenient but necessary: in a model with exogenous execution, quote changes cannot honestly be credited with changing volume.
+
+The simulations reproduce the theoretical spread to within \SpreadMaxError\ price units over the tested grid. At an informed-trader probability of $0.20$, Bayesian updating reduces fair-value root mean squared error by \RmseDropAtTwenty\ and terminal P\&L standard deviation by \PnlSdDropAtTwenty\ relative to static quoting. The paired RMSE difference is \PairedRmseDeltaTwenty, with an approximate 95\% confidence interval from \PairedRmseCiLow\ to \PairedRmseCiHigh. Under a shift from low to high information intensity, a 20-trade rolling estimator adapts in a median of \RollingMedianDelay\ trades among paths satisfying the pre-specified stability criterion, but it does so by discarding evidence and therefore pays a variance cost. The inventory experiments recover a similar tension: stronger skew compresses position tails, though the policy is not derived as an optimum and the fill curve is imposed rather than estimated. These results describe the stated simulations. They are not evidence of a profitable live-market strategy.
+\end{abstract}
+
+\section{Introduction}
+
+A market maker posts prices before knowing who will trade. That timing is the source of the problem. A customer who buys may simply value immediacy, but the same order may come from someone who knows that the asset is worth more than the posted ask. The trade is therefore both a transaction and a signal. Glosten and Milgrom formalised this point in a sequential model where informed order flow can generate a positive spread even for a risk-neutral specialist earning zero expected profit \cite{glosten_milgrom_1985}.
+
+This project takes that idea seriously, but not literally. It does not try to reproduce a modern electronic limit order book. Instead, it asks how far one can get with a model small enough to derive on paper and then challenge in code. That restriction has a practical advantage. Large simulators can hide reversed inventory signs, accidental access to latent variables, or execution assumptions that quietly pay for attractive P\&L. Here, the closed-form spread acts as a test oracle.
+
+The central question is:
+
+\begin{quote}
+How should a market maker revise its prices when order direction is informative, and what breaks when the information environment is unknown, unstable, or combined with inventory risk?
+\end{quote}
+
+The study proceeds in stages. The first model isolates information asymmetry. It derives competitive quotes, treats order flow as a sequence of Bayesian observations, and measures the effect of using a wrong information parameter. A joint filter then attempts to infer both the hidden value and the prevalence of informed traders. The next experiment deliberately violates stationarity by changing that prevalence halfway through an episode. Finally, inventory is studied in a separate quote-sensitive execution model.
+
+The separation is less elegant than one unified simulator. It also prevents a false causal story. If every customer trades regardless of price, moving a quote cannot reduce the number of fills; any apparent inventory control would be an accounting artefact. A second model is therefore introduced only when execution is allowed to respond to quote distance.
+
+\section{Information Model}
+
+\subsection{Terminal value and trader types}
+
+The asset settles at
+\begin{equation}
+V \in \{L,H\}, \qquad L < H,
+\end{equation}
+with prior
+\begin{equation}
+P(V=H)=p_0.
+\end{equation}
+The baseline values are
+\begin{equation}
+L=90, \qquad H=110, \qquad p_0=\frac{1}{2}.
+\end{equation}
+
+Each arriving trader is informed with probability $\alpha$. An informed trader observes $V$ perfectly and buys when $V=H$, while selling when $V=L$. A noise trader buys or sells with equal probability. It follows that
+\begin{align}
+P(Buy\mid H) &= \frac{1+\alpha}{2}, \\
+P(Buy\mid L) &= \frac{1-\alpha}{2}.
+\end{align}
+The sell probabilities are symmetric.
+
+This classification is intentionally crude. Real order flow does not divide neatly into omniscient insiders and coin-flipping liquidity traders. Information is noisy, motives overlap, trade sizes vary, and informed agents may strategically conceal their signals. The binary construction remains useful because it isolates the adverse-selection mechanism without obscuring it behind a larger behavioural model.
+
+\subsection{Competitive quotes}
+
+Let
+\begin{equation}
+p_t=P(V=H\mid\mathcal{F}_t)
+\end{equation}
+denote the market maker's belief before the next trade, where $\mathcal{F}_t$ is the observed order history. A zero-profit competitive ask is the expected terminal value conditional on a customer buy:
+\begin{equation}
+A_t=E[V\mid Buy,\mathcal{F}_t].
+\end{equation}
+Similarly,
+\begin{equation}
+B_t=E[V\mid Sell,\mathcal{F}_t].
+\end{equation}
+At the symmetric prior, Bayes' rule gives
+\begin{align}
+P(H\mid Buy)&=\frac{1+\alpha}{2}, \\
+P(H\mid Sell)&=\frac{1-\alpha}{2}.
+\end{align}
+Hence
+\begin{align}
+A_0 &= \frac{H+L}{2}+\frac{H-L}{2}\alpha, \\
+B_0 &= \frac{H+L}{2}-\frac{H-L}{2}\alpha,
+\end{align}
+and the informational spread is
+\begin{equation}
+\boxed{A_0-B_0=(H-L)\alpha.}
+\end{equation}
+For $L=90$ and $H=110$,
+\begin{equation}
+A_0-B_0=20\alpha.
+\end{equation}
+At $\alpha=0.20$, the competitive quote is $98/102$.
+
+The spread is not a generic markup. It compensates the dealer for conditioning on the event that a counterparty chose to trade. Once a buy has occurred, the relevant comparison is not the unconditional value $E[V]=100$, but $E[V\mid Buy]=102$.
+
+\subsection{Sequential learning}
+
+After observing a buy, the posterior becomes
+\begin{equation}
+p_{t+1}
+=
+\frac{p_t P(Buy\mid H)}
+{p_tP(Buy\mid H)+(1-p_t)P(Buy\mid L)}.
+\end{equation}
+The update after a sell is analogous. In log-odds form,
+\begin{equation}
+\log\frac{p_t}{1-p_t}
+=
+\log\frac{p_0}{1-p_0}
++(N_B-N_S)
+\log\frac{1+\alpha}{1-\alpha},
+\end{equation}
+where $N_B$ and $N_S$ are cumulative buys and sells. Order imbalance is a sufficient statistic in this model. A larger $\alpha$ increases the likelihood ratio attached to each trade, which suggests faster learning but also more severe losses when early quotes are wrong.
+
+\subsection{Cash, inventory, and terminal wealth}
+
+Trade direction is defined from the customer's perspective. A customer buy means the market maker sells one unit at the ask:
+\begin{align}
+C_{t+1}&=C_t+A_t, \\
+q_{t+1}&=q_t-1.
+\end{align}
+A customer sell means the market maker buys at the bid:
+\begin{align}
+C_{t+1}&=C_t-B_t, \\
+q_{t+1}&=q_t+1.
+\end{align}
+Terminal wealth is
+\begin{equation}
+W_T=C_T+q_TV.
+\end{equation}
+The simulator also records trade-level economic P\&L. Selling at the ask contributes $A_t-V$; buying at the bid contributes $V-B_t$. Automated tests reconcile the sum of these trade-level quantities with terminal cash plus marked inventory.
+
+\section{Unknown and Changing Information Intensity}
+
+When $\alpha$ is unknown, the market maker places prior mass on a finite grid and maintains
+\begin{equation}
+P(V,\alpha\mid\mathcal{F}_t).
+\end{equation}
+For an observed side $D_t\in\{Buy,Sell\}$,
+\begin{equation}
+P(V,\alpha\mid\mathcal{F}_{t})
+\propto
+P(D_t\mid V,\alpha)
+P(V,\alpha\mid\mathcal{F}_{t-1}).
+\end{equation}
+Quotes integrate over both sources of uncertainty.
+
+A fixed-parameter posterior is coherent only while the environment is stationary. To study a regime change, the simulation switches from $\alpha=0.05$ to $\alpha=0.40$ halfway through an episode. The full-history filter remains formally Bayesian under the wrong assumption that one constant $\alpha$ generated the entire tape. Rolling filters instead rebuild the joint posterior from the most recent $w$ observations. They are adaptive, but no longer use all available information. This is a bias--variance choice rather than a free improvement.
+
+\section{A Separate Inventory Model}
+
+The information model produces exactly one trade at each step. Order direction depends on trader type and hidden value, not on quote aggressiveness. Under that assumption, widening the market does not reduce volume.
+
+Inventory is therefore studied in a second environment. The public midprice follows
+\begin{equation}
+S_{t+1}=S_t+\sigma Z_t, \qquad Z_t\sim\mathcal{N}(0,1),
+\end{equation}
+and the quote centre is shifted by current inventory:
+\begin{equation}
+r_t=S_t-\beta q_t.
+\end{equation}
+The bid and ask are
+\begin{equation}
+B_t=r_t-\delta, \qquad A_t=r_t+\delta.
+\end{equation}
+A positive inventory moves both quotes downward, making the ask more attractive and the bid less attractive. Execution probability declines with quote distance:
+\begin{equation}
+P(Fill\mid d)=A_0e^{-kd}.
+\end{equation}
+The setup is motivated by the inventory and execution trade-off in Avellaneda and Stoikov \cite{avellaneda_stoikov_2008}, but the linear skew used here is not their optimal-control solution. It is a policy experiment.
+
+\section{Experimental Design}
+
+\subsection{Pre-specified hypotheses}
+
+The numerical work tests eight claims.
+
+\begin{enumerate}[label=H\arabic*.]
+\item The simulated conditional-value spread should follow $(H-L)\alpha$.
+\item Higher $\alpha$ should accelerate posterior concentration around the true state.
+\item Bayesian updating should reduce fair-value error and P\&L dispersion relative to static quotes, though it need not increase mean profit under correct specification.
+\item Underestimating $\alpha$ should leave quotes too tight and produce adverse-selection losses.
+\item A joint posterior over $(V,\alpha)$ should identify the broad information environment, but finite samples may not separate value and signal strength precisely.
+\item After an abrupt increase in $\alpha$, rolling filters should adapt faster than a full-history filter, at the cost of greater sampling variability.
+\item Stronger inventory skew should reduce position tails while eventually sacrificing some average P\&L.
+\item Once fills respond to price, quote distance should produce an interior profit maximum rather than a monotone increase in P\&L.
+\end{enumerate}
+
+\subsection{Monte Carlo protocol}
+
+The full run uses seed \ResultsSeed. Spread validation contains 100,000 one-trade trials per value of $\alpha$. Price discovery uses 3,000 paths of 80 trades. Static-versus-Bayesian comparison uses 6,000 episodes of 60 trades at each information level. The misspecification grid uses 1,800 episodes for every $(\alpha,\widehat{\alpha})$ pair, and the unknown-$\alpha$ study uses 2,500 episodes of 80 trades. The regime experiment uses 800 paths of 200 trades, switching after trade 100. Inventory experiments use 3,500 paths of 300 steps.
+
+Competing strategies face identical hidden states and order tapes. Inventory policies also reuse random streams across parameter values. Common random numbers do not alter expectations, but they make paired differences less noisy. The main strategy comparison therefore reports both separate distributions and episode-by-episode differences.
+
+The principal metrics are mean terminal P\&L, standard deviation, fifth percentile, fair-value RMSE, informed-flow P\&L, noise-flow P\&L, and mean quoted spread. Price-discovery experiments report posterior confidence and threshold hitting times. A regime estimator is considered adapted when its $\alpha$ estimate lies within $0.10$ of the new value for five consecutive observations. The criterion was fixed before reading the run output.
+
+No claim rests on one trajectory. Means are accompanied by dispersion measures, and the analytical spread is checked before later experiments are interpreted.
+
+\section{Results}
+
+\subsection{Analytical spread validation}
+
+Figure~\ref{fig:spread} compares the closed-form spread with its Monte Carlo estimate. The largest absolute discrepancy over the grid is \SpreadMaxError. Given the price range of 20 and finite conditional samples, this is small. More important than the magnitude is the shape: the simulated relationship is linear for the reason predicted by the likelihood model.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{01_spread_validation.pdf}
+\caption{Theoretical and simulated informational spread.}
+\label{fig:spread}
+\end{figure}
+
+This is not an empirical discovery. It is an implementation check. Had the points missed the line materially, later P\&L results would have been difficult to trust.
+
+\subsection{Price discovery}
+
+Figure~\ref{fig:discovery} shows posterior confidence assigned to the true state. The jagged median paths are not numerical noise. Posterior odds move on a discrete lattice determined by net order imbalance, so the median can alternate between neighbouring levels even when the broader trend is upward.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{02_price_discovery.pdf}
+\caption{Median posterior confidence, with interquartile bands.}
+\label{fig:discovery}
+\end{figure}
+
+At $\alpha=0.20$, paths that reach 95\% confidence do so after a median of \MedianHitTwenty\ trades. At $\alpha=0.40$, the corresponding median is \MedianHitForty\ trades. Weakly informative flow can remain ambiguous for much longer.
+
+There is a genuine tension. A larger informed fraction makes each trade more dangerous to the dealer, yet it also makes the hidden state easier to learn. The model does not label high $\alpha$ simply good or bad; it raises both the cost of early mistakes and the speed at which those mistakes become avoidable.
+
+\subsection{Static and Bayesian quotes}
+
+The static strategy keeps $p_t=0.5$ and repeatedly posts the initial competitive quote. The Bayesian strategy updates after every trade. Table~\ref{tab:strategy} reports selected results.
+
+\begin{table}[H]
+\centering
+\caption{Estimation error and P\&L dispersion under static and Bayesian quoting.}
+\label{tab:strategy}
+\begin{tabular}{ccccc}
+\toprule
+$\alpha$ & Static RMSE & Bayesian RMSE & Static P\&L SD & Bayesian P\&L SD \\
+\midrule
+\StrategyRows
+\bottomrule
+\end{tabular}
+\end{table}
+
+At $\alpha=0.20$, belief updating lowers RMSE by \RmseDropAtTwenty\ and P\&L standard deviation by \PnlSdDropAtTwenty. Mean profit remains close to zero for both strategies. That result is consistent with the construction: correctly conditioned competitive quotes are designed to break even in expectation. Bayesian updating improves state estimation and concentrates risk; it does not manufacture positive expected profit from a zero-profit model.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{03_strategy_rmse.pdf}
+\caption{Fair-value RMSE under static and Bayesian strategies.}
+\label{fig:rmse}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{04_strategy_pnl_dispersion.pdf}
+\caption{Terminal P\&L dispersion under static and Bayesian strategies.}
+\label{fig:pnl-dispersion}
+\end{figure}
+
+Because both strategies see the same simulated episodes, the difference can be evaluated directly. At $\alpha=0.20$, the mean paired RMSE change, Bayesian minus static, is \PairedRmseDeltaTwenty. Its approximate 95\% confidence interval is $[\PairedRmseCiLow,\PairedRmseCiHigh]$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{05_paired_rmse_difference.pdf}
+\caption{Paired RMSE differences on identical order tapes; bars show approximate 95\% confidence intervals for the mean difference.}
+\label{fig:paired-rmse}
+\end{figure}
+
+The static strategy's RMSE is exactly 10 because it always estimates 100 while the realised value is 90 or 110. Its unconditional mean P\&L can still remain near zero. Poor state estimation and zero unconditional profit are not contradictory.
+
+\subsection{Misspecifying the informed fraction}
+
+The misspecification grid separates the true $\alpha$ from the market maker's assumed $\widehat{\alpha}$. Fair-value error is fairly flat near the diagonal at high information levels, but the P\&L surface is strongly asymmetric.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.76\textwidth]{06_misspecification_rmse.pdf}
+\caption{Fair-value RMSE under misspecification.}
+\label{fig:misspec-rmse}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.76\textwidth]{07_misspecification_pnl.pdf}
+\caption{Mean terminal P\&L under misspecification.}
+\label{fig:misspec-pnl}
+\end{figure}
+
+When the true value is $\alpha=0.40$ but the strategy assumes $0.20$, mean terminal P\&L is \MisspecPnl\ and fair-value RMSE is \MisspecRmse. With correct specification, the corresponding values are \CorrectPnl\ and \CorrectRmse. Underestimation leaves the dealer exposed to flow that carries more information than the quote anticipates.
+
+Overestimation often produces positive mean P\&L in Figure~\ref{fig:misspec-pnl}. The pattern is not a free trading strategy. The information model forces one execution at every step, so a wider quote does not lose business; a live customer would respond to price, and a competing dealer could undercut an excessively wide market. The apparent reward for overestimating $\alpha$ is therefore partly an artefact of exogenous execution. This failure is informative because its source is explicit.
+
+\subsection{Learning an unknown information environment}
+
+The joint filter places prior mass on
+\begin{equation}
+\alpha\in\{0.05,0.10,0.20,0.30,0.40,0.50\}
+\end{equation}
+and updates $P(V,\alpha\mid\mathcal{F}_t)$. It is compared with an oracle that knows the true $\alpha$ and a fixed strategy that assumes $0.20$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{08_unknown_alpha_rmse.pdf}
+\caption{Fair-value RMSE when $\alpha$ is known, fixed, or jointly inferred.}
+\label{fig:unknown-alpha}
+\end{figure}
+
+The joint estimator's mean terminal absolute error in $\alpha$ is \JointAlphaMae. Calibration is directionally correct, but estimates are pulled toward the centre of the prior grid.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{09_alpha_calibration.pdf}
+\caption{Calibration of the joint posterior mean for $\alpha$.}
+\label{fig:alpha-calibration}
+\end{figure}
+
+The joint filter does not dominate the fixed rule in every short-horizon RMSE comparison. A long run of buys can be explained by a high terminal value, a high informed fraction, or both. Since each episode contains only one hidden value, those explanations are not cleanly separated. A richer parameterisation can therefore slow value inference even while it appears more realistic.
+
+\subsection{Regime change}
+
+The stationary assumption is then broken. The true informed-trader probability rises from $0.05$ to $0.40$ after 100 trades. Figure~\ref{fig:regime-alpha} compares a full-history joint filter with rolling windows.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.86\textwidth]{10_regime_alpha_estimate.pdf}
+\caption{Median estimate of $\alpha$ following a low-to-high information-regime change.}
+\label{fig:regime-alpha}
+\end{figure}
+
+The 20-trade window reaches the stability criterion on \RollingReachRate\ of paths and, conditional on reaching it, has a median delay of \RollingMedianDelay\ trades. Its mean post-switch absolute error is \RollingPostMae. The full-history filter reaches the same criterion on only \FullHistoryReachRate\ of paths and has post-switch error \FullHistoryPostMae.
+
+\begin{table}[H]
+\centering
+\caption{Adaptation after the regime change. Delay is reported only for paths satisfying the five-observation stability rule.}
+\label{tab:regime}
+\begin{tabular}{lccc}
+\toprule
+Estimator & Reach rate & Median delay & Post-switch MAE \\
+\midrule
+\RegimeRows
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{11_regime_post_switch_error.pdf}
+\caption{Mean post-switch error across full-history and rolling estimators.}
+\label{fig:regime-error}
+\end{figure}
+
+Short memory adapts quickly because old low-$\alpha$ observations disappear. That same forgetting makes estimates noisier and prevents the rolling filter from being interpreted as a posterior under the original stationary model. The 20-trade window performs well for this particular jump and horizon; it should not be mistaken for a generally optimal window.
+
+\subsection{Inventory control}
+
+The inventory experiment varies the skew coefficient $\beta$. Moving from $\beta=0$ to $\beta=0.10$ reduces mean maximum absolute inventory by \InventoryExposureDrop\ and P\&L standard deviation by \InventoryRiskDrop. Mean P\&L falls by \InventoryMeanPnlDrop\ over the same comparison.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{12_inventory_exposure.pdf}
+\caption{Inventory exposure as the quote centre becomes more inventory-sensitive.}
+\label{fig:inventory-exposure}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{13_inventory_pnl.pdf}
+\caption{Mean and fifth-percentile P\&L under inventory skew.}
+\label{fig:inventory-pnl}
+\end{figure}
+
+The lower tail improves before flattening. Stronger skew also draws one side of the quote closer to the midprice, which can raise fill count. At high $\beta$, however, the dealer trades away part of the spread to flatten inventory. The experiment suggests a risk-return frontier; it does not derive an optimum.
+
+\subsection{Quote distance and execution}
+
+Once fills depend on quote distance, a wider market is no longer mechanically better. Mean P\&L peaks at a half-spread of \BestHalfSpread, where the model produces approximately \BestHalfSpreadPnl\ units of terminal P\&L and \BestHalfSpreadFills\ fills per episode.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{14_quote_distance_pnl.pdf}
+\caption{Mean P\&L as quote distance changes.}
+\label{fig:quote-pnl}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.78\textwidth]{15_quote_distance_fills.pdf}
+\caption{Execution count as quote distance changes.}
+\label{fig:quote-fills}
+\end{figure}
+
+The interior maximum is not an estimate of a real-market spread. It is generated by the imposed exponential fill curve, volatility, and horizon. It nevertheless restores the mechanism absent from the adverse-selection model: price affects participation.
+
+\section{Discussion}
+
+The experiments support a limited claim. In the binary setting, order direction is sufficient to turn market making into a sequential inference problem. Bayesian updating changes the distribution of outcomes even when it leaves expected profit close to zero. The analytical spread, posterior dynamics, and two routes to P\&L accounting agree. That internal consistency is more persuasive than unexplained profitability in a larger simulator.
+
+Misspecification exposes the baseline model's weakest assumption. Underestimating informed flow is costly for a clear reason: the dealer interprets informative trades as if they were closer to random. Overestimating it appears profitable because customers do not leave when quotes widen. One might argue that this makes the P\&L heatmap uninformative. A narrower reading seems more defensible. The graph separates a genuine adverse-selection effect from a benefit purchased by an unrealistic execution rule.
+
+Unknown $\alpha$ creates a second source of friction. Joint inference sounds strictly richer than fixing a parameter, but richer models pay for flexibility. When both the state and signal strength are unknown, short order sequences may not identify them separately. The regime experiment adds another complication: a full-history posterior can be coherent and still adapt badly when its stationarity assumption fails. Rolling windows react faster, but their apparent success depends on the chosen jump size, horizon, grid, and tolerance.
+
+The inventory experiments recover familiar qualitative patterns from market-making theory. Position-aware quotes compress inventory tails, and execution declines with quote distance. The linear skew is not proved optimal, and information risk is not solved jointly with inventory risk. A unified model would be more realistic only if its order-arrival mechanism also became more realistic. Adding features without changing the causal structure would increase code volume rather than explanatory power.
+
+\section{Limitations}
+
+The main limitations are structural rather than computational.
+
+\begin{enumerate}
+\item The terminal value is binary and fixed throughout each information episode.
+\item Informed traders know the terminal state perfectly. They receive no noisy signals and do not split orders strategically.
+\item Noise traders buy and sell with equal probability and fixed unit size.
+\item The baseline information model has exogenous execution. Quote width does not affect volume.
+\item There is one market maker, no price competition, no queue position, no latency, no fees, no tick size, and no partial fills.
+\item The joint-$\alpha$ model assumes the correct likelihood family and a small discrete parameter grid.
+\item Value and information intensity are only weakly identified from one short order tape.
+\item The regime change is a single deterministic jump. The rolling-window rule is a heuristic, not a hidden-state model.
+\item The inventory model uses a Gaussian random walk and an imposed exponential fill curve. Neither is calibrated to market data.
+\item Information risk and inventory risk are studied in separate environments. Interactions between them may change the ranking of policies.
+\item The experiments use one principal seed profile. Common random numbers improve comparisons but do not replace robustness across model families.
+\item The outputs are simulated and do not constitute evidence of live-market profitability.
+\end{enumerate}
+
+These restrictions determine which conclusions are defensible. The project can show how beliefs, quotes, execution, and inventory interact under explicit assumptions. It cannot infer how a production market maker should quote a real instrument.
+
+\section{Reproducibility and Software Design}
+
+The primary simulator is written in OCaml and built with Dune. Hidden state is generated by the order-tape module and never passed into the strategy interface. Quotes are computed before the next trade is observed; reversing that order would leak the information contained in the execution. Strategies are evaluated on shared tapes, and every experiment accepts an explicit seed.
+
+The numerical values in this document correspond to the \ResultsProfile\ run recorded in the manifest, using seed \ResultsSeed\ and engine \texttt{\ResultsEngine}. A separate Python implementation repeats the model equations rather than wrapping the OCaml executable. Its purpose is to expose sign, conditioning, and aggregation disagreements. The repository's continuous-integration workflow builds the OCaml source, runs the test suite, executes the reduced experiment profile, validates the generated CSV files, and compiles the report.
+
+The test suite covers the $98/102$ quote, sequential and count-form Bayes updates, posterior normalisation, rolling-window expiry, customer-side accounting conventions, terminal P\&L reconciliation, deterministic scenario generation, regime switching, inventory-skew direction, fill-probability monotonicity, and sample statistics. Output-level checks then test broader invariants: the analytical spread, paired RMSE improvement, P\&L attribution, inventory reduction, and monotone decline in fills with quote distance.
+
+A full run consists of four stages: build and test the OCaml project; run the experiment executable; generate figures and LaTeX fragments from the CSV files; compile this paper. The checked-in CSVs retain an engine label so that numerical provenance is not inferred from the repository language.
+
+\section{Conclusion}
+
+The binary model is too small to resemble a real exchange. It is large enough to punish sloppy reasoning. A buy changes the posterior. The informational spread follows from a likelihood ratio. Correctly specified Bayesian quotes do not create profit from nowhere; they improve estimation and compress the P\&L distribution. Misspecification matters. Stationarity matters. Inventory control requires an execution mechanism in which prices affect fills.
+
+The strongest result is methodological rather than financial: derive a benchmark, test it, preserve the timing of information, compare strategies on the same random worlds, and treat an attractive output as a prompt to inspect its assumptions. The simulator remains deliberately bounded. That is a feature, provided the boundary is kept visible.
+
+\begin{thebibliography}{9}
+
+\bibitem{glosten_milgrom_1985}
+Lawrence R. Glosten and Paul R. Milgrom.
+\newblock Bid, Ask and Transaction Prices in a Specialist Market with Heterogeneously Informed Traders.
+\newblock \emph{Journal of Financial Economics}, 14(1):71--100, 1985.
+
+\bibitem{avellaneda_stoikov_2008}
+Marco Avellaneda and Sasha Stoikov.
+\newblock High-Frequency Trading in a Limit Order Book.
+\newblock \emph{Quantitative Finance}, 8(3):217--224, 2008.
+
+\bibitem{harris_2002}
+Larry Harris.
+\newblock \emph{Trading and Exchanges: Market Microstructure for Practitioners}.
+\newblock Oxford University Press, 2002.
+
+\end{thebibliography}
+
+\end{document}

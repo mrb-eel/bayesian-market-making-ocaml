@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this repository, please cite the software and accompanying report."
+title: "Bayesian Market Making in a Binary Information Model"
+type: software
+authors:
+  - family-names: Bouchaibi
+    given-names: Mohamed Rayan
+email: moh.bouchaibi@gmail.com
+year: 2026
+license: MIT
+version: 1.0.0

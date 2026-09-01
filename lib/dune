@@ -1,0 +1,16 @@
+(library
+ (name market_maker)
+ (libraries unix)
+ (modules
+  domain
+  random_tools
+  binary_model
+  order_tape
+  joint_filter
+  rolling_filter
+  strategy
+  information_sim
+  stats
+  csv_writer
+  inventory_sim
+  experiments))
