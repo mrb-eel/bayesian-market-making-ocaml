@@ -18,6 +18,4 @@ python analysis/plot_results.py \
   --report-dir results/tmp/report
 ```
 
-New strategies should be evaluated on the same scenario tapes as their comparison baseline. Report a distribution or paired difference rather than a mean alone. Hidden state must not enter a strategy interface, and the quote must be formed before the current order is observed.
-
 Do not commit `_build`, virtual environments, temporary output directories, or LaTeX auxiliary files.
