@@ -8,7 +8,7 @@ $$
 \mathrm{Ask}-\mathrm{Bid}=(H-L)\alpha.
 $$
 
-The formula is simple enough to derive by hand and strict enough to catch a broken simulator. The later experiments then ask where that clean result survives, where it becomes fragile, and which conclusions are artefacts of the execution model.
+The later experiments then ask where that clean result survives, where it becomes fragile, and which conclusions are artefacts of the execution model.
 
 ![Analytical and simulated spread](results/figures/01_spread_validation.png)
 
