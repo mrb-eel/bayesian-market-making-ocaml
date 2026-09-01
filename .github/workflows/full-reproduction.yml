@@ -1,0 +1,35 @@
+name: full-reproduction
+
+"on":
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.2.1
+
+      - name: Install OCaml dependencies
+        run: opam install . --deps-only --with-test
+
+      - name: Build and test
+        run: |
+          opam exec -- dune build @all
+          opam exec -- dune runtest
+
+      - name: Run full OCaml experiments
+        run: >-
+          opam exec -- dune exec bin/main.exe -- all
+          --seed 20260831
+          --out release/results/data
