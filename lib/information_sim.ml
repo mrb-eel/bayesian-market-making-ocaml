@@ -45,6 +45,10 @@ let execute_fill account ~customer_side (live_quote : Domain.quote) =
         inventory_units = account.inventory_units + 1;
       }
 
+let settle account ~terminal_value =
+  account.cash_balance
+  +. (float_of_int account.inventory_units *. terminal_value)
+
 let economic_trade_pnl
     ~terminal_value
     ~customer_side
