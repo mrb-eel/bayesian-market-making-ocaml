@@ -28,19 +28,23 @@
 \title{Bayesian Learning and Model Risk in a Binary Market-Making Model\\
 \large A Reproducible Computational Note on Adverse Selection, Misspecification, and Regime Change}
 \author{Mohamed Rayan Bouchaibi\\
-\small Bachelor's student in Mathematics, \'Ecole polytechnique f\'ed\'erale de Lausanne (EPFL)}
+\small Mathematics Section, School of Basic Sciences\\
+\small \'Ecole polytechnique f\'ed\'erale de Lausanne (EPFL), Lausanne, Switzerland}
 \date{September 2026}
 
 \begin{document}
 \maketitle
 
 \begin{center}
-\small Technical report. Not peer reviewed.
+\small Independent technical report. Not peer reviewed.\\
+\small This work was conducted independently and is not an official publication or endorsement of EPFL.
 \end{center}
 
 \begin{abstract}
 This note studies a small market-making model in which a terminal asset value is binary and incoming traders are either informed or liquidity-motivated. The model is intentionally restrictive because it admits analytical benchmarks that can be used to audit the simulator. Competitive bid and ask prices are derived for a general prior, sequential learning is expressed in log-odds form, and the information rate of order flow is made explicit. An OCaml implementation is then used to examine static and Bayesian quoting, misspecification of the informed-trader probability, joint inference of value and information intensity, and adaptation after an abrupt regime change. A separate quote-sensitive execution model is retained as an appendix to show why inventory claims require price-dependent fills. The simulations reproduce the analytical spread to within \SpreadMaxError\ price units over the tested grid. At $\alpha=0.20$, Bayesian updating reduces fair-value root mean squared error by \RmseDropAtTwenty\ and terminal P\&L standard deviation by \PnlSdDropAtTwenty\ relative to a static belief. The main contribution is methodological: analytical identities, hidden-state boundaries, paired random worlds, independent implementations, and explicit failure modes make the numerical claims auditable. The results describe the stated models and do not constitute evidence of live-market profitability.
 \end{abstract}
+
+\noindent\textbf{Keywords:} Bayesian inference; market microstructure; market making; adverse selection; model misspecification; sequential learning; regime change.
 
 \section{Introduction}
 
