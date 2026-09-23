@@ -1,11 +1,29 @@
 cff-version: 1.2.0
-message: "If you use this repository, please cite the software and accompanying report."
-title: "Bayesian Market Making in a Binary Information Model"
+message: "If you use this software, please cite the technical report in preferred-citation and archive the exact software release used."
+title: "Bayesian Market Making in OCaml"
 type: software
+abstract: "A reproducible OCaml simulation study of Bayesian market making under adverse selection, including sequential learning, parameter misspecification, joint inference of information intensity, regime change, and a separate quote-sensitive inventory experiment."
 authors:
   - family-names: Bouchaibi
     given-names: Mohamed Rayan
-email: moh.bouchaibi@gmail.com
-year: 2026
+    affiliation: "Ecole polytechnique federale de Lausanne (EPFL)"
+    email: moh.bouchaibi@gmail.com
 license: MIT
-version: 1.0.0
+repository-code: "https://github.com/mrb-eel/bayesian-market-making-ocaml"
+url: "https://github.com/mrb-eel/bayesian-market-making-ocaml"
+keywords:
+  - market making
+  - market microstructure
+  - Bayesian inference
+  - adverse selection
+  - quantitative finance
+  - OCaml
+  - Monte Carlo simulation
+preferred-citation:
+  type: report
+  title: "Bayesian Learning and Model Risk in a Binary Market-Making Model"
+  authors:
+    - family-names: Bouchaibi
+      given-names: Mohamed Rayan
+  year: 2026
+  url: "https://github.com/mrb-eel/bayesian-market-making-ocaml/blob/main/report/Bayesian_Market_Making_Report.pdf"
