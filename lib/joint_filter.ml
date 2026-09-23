@@ -29,36 +29,60 @@ let total_mass filter =
   Array.fold_left ( +. ) 0.0 filter.low_mass
   +. Array.fold_left ( +. ) 0.0 filter.high_mass
 
+let log_probability_power probability count =
+  if count = 0 then 0.0
+  else if probability = 0.0 then neg_infinity
+  else float_of_int count *. log probability
+
+let log_likelihood_from_counts ~buy_probability ~buys ~sells =
+  log_probability_power buy_probability buys
+  +. log_probability_power (1.0 -. buy_probability) sells
+
+let log_prior_mass probability prior_alpha =
+  if probability = 0.0 then neg_infinity else log probability +. log prior_alpha
+
 let from_order_counts ~prior_high ~alpha_grid ~buys ~sells =
   if buys < 0 || sells < 0 then invalid_arg "order counts cannot be negative";
   validate_inputs ~prior_high ~alpha_grid;
   let slots = Array.length alpha_grid in
-  let low_mass = Array.make slots 0.0 in
-  let high_mass = Array.make slots 0.0 in
   let prior_alpha = 1.0 /. float_of_int slots in
-  let evidence = ref 0.0 in
-
+  let low_log_weights = Array.make slots neg_infinity in
+  let high_log_weights = Array.make slots neg_infinity in
+  let max_log_weight = ref neg_infinity in
   for alpha_slot = 0 to slots - 1 do
     let alpha = alpha_grid.(alpha_slot) in
     let buy_high = Binary_model.buy_chance ~alpha High in
     let buy_low = Binary_model.buy_chance ~alpha Low in
-    let high_likelihood =
-      (buy_high ** float_of_int buys) *. ((1.0 -. buy_high) ** float_of_int sells)
+    let high_log_weight =
+      log_prior_mass prior_high prior_alpha
+      +. log_likelihood_from_counts ~buy_probability:buy_high ~buys ~sells
     in
-    let low_likelihood =
-      (buy_low ** float_of_int buys) *. ((1.0 -. buy_low) ** float_of_int sells)
+    let low_log_weight =
+      log_prior_mass (1.0 -. prior_high) prior_alpha
+      +. log_likelihood_from_counts ~buy_probability:buy_low ~buys ~sells
     in
-    let low_weight = (1.0 -. prior_high) *. prior_alpha *. low_likelihood in
-    let high_weight = prior_high *. prior_alpha *. high_likelihood in
+    high_log_weights.(alpha_slot) <- high_log_weight;
+    low_log_weights.(alpha_slot) <- low_log_weight;
+    max_log_weight := max !max_log_weight high_log_weight;
+    max_log_weight := max !max_log_weight low_log_weight
+  done;
+  if !max_log_weight = neg_infinity then
+    invalid_arg "joint posterior has zero evidence";
+  let low_mass = Array.make slots 0.0 in
+  let high_mass = Array.make slots 0.0 in
+  let scaled_evidence = ref 0.0 in
+  for alpha_slot = 0 to slots - 1 do
+    let low_weight = exp (low_log_weights.(alpha_slot) -. !max_log_weight) in
+    let high_weight = exp (high_log_weights.(alpha_slot) -. !max_log_weight) in
     low_mass.(alpha_slot) <- low_weight;
     high_mass.(alpha_slot) <- high_weight;
-    evidence := !evidence +. low_weight +. high_weight
+    scaled_evidence := !scaled_evidence +. low_weight +. high_weight
   done;
-
-  if !evidence <= 0.0 then invalid_arg "joint posterior has zero evidence";
+  if !scaled_evidence <= 0.0 || Float.is_nan !scaled_evidence then
+    invalid_arg "joint posterior has zero evidence";
   for alpha_slot = 0 to slots - 1 do
-    low_mass.(alpha_slot) <- low_mass.(alpha_slot) /. !evidence;
-    high_mass.(alpha_slot) <- high_mass.(alpha_slot) /. !evidence
+    low_mass.(alpha_slot) <- low_mass.(alpha_slot) /. !scaled_evidence;
+    high_mass.(alpha_slot) <- high_mass.(alpha_slot) /. !scaled_evidence
   done;
   { alpha_grid = Array.copy alpha_grid; low_mass; high_mass }
 

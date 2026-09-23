@@ -3,6 +3,7 @@ open Domain
 open Order_tape
 
 let failures = ref []
+let tests_run = ref 0
 let fail message = raise (Failure message)
 
 let check_close ?(tolerance = 1e-9) label expected actual =
@@ -21,6 +22,7 @@ let check_invalid_argument label thunk =
   | exception Invalid_argument _ -> ()
 
 let run_test name test_body =
+  incr tests_run;
   try
     test_body ();
     Printf.printf "ok  %s\n%!" name
@@ -310,8 +312,32 @@ let () =
       check_close "sample variance" (5.0 /. 3.0)
         (Stats.variance observations));
 
+    run_test "general-prior spread matches the closed form" (fun () ->
+      let prior_high = 0.37 in
+      let alpha = 0.25 in
+      let quote =
+        Binary_model.competitive_quote market ~prior_high ~alpha
+      in
+      let state_scale = market.high_value -. market.low_value in
+      let imbalance = (2.0 *. prior_high) -. 1.0 in
+      let expected_spread =
+        state_scale
+        *. ((4.0 *. alpha *. prior_high *. (1.0 -. prior_high))
+           /. (1.0 -. ((alpha *. alpha) *. (imbalance *. imbalance))))
+      in
+      check_close "general-prior spread" expected_spread (quote.ask -. quote.bid));
+
+  run_test "joint count constructor is stable for large balanced samples" (fun () ->
+      let filter =
+        Joint_filter.from_order_counts ~prior_high:0.5
+          ~alpha_grid:[| 0.05; 0.10; 0.20; 0.30; 0.40; 0.50 |]
+          ~buys:5_000 ~sells:5_000
+      in
+      check_close "mass" 1.0 (Joint_filter.total_mass filter);
+      check_close "balanced state posterior" 0.5
+        (Joint_filter.posterior_high filter));
   match List.rev !failures with
-  | [] -> Printf.printf "\nAll %d tests passed.\n%!" 23
+  | [] -> Printf.printf "\nAll %d tests passed.\n%!" !tests_run
   | failed ->
       Printf.eprintf "\n%d test(s) failed:\n" (List.length failed);
       List.iter
